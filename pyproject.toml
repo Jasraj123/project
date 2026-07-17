@@ -1,0 +1,18 @@
+[project]
+name = "personio-employee-export"
+version = "1.0.0"
+description = "Export Personio employee data to a clean CSV plus a department summary."
+requires-python = ">=3.9"
+dependencies = [
+    "requests==2.32.3",
+    "PyYAML==6.0.2",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+# A pragmatic, readable rule set: pyflakes (F), pycodestyle (E/W),
+# import sorting (I), bugbear (B) and pyupgrade (UP).
+select = ["E", "F", "W", "I", "B", "UP"]

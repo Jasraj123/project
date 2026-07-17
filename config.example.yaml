@@ -1,0 +1,25 @@
+# Personio Employee Export - configuration
+#
+# Copy this file to "config.yaml" and fill in your own values.
+# Never commit config.yaml - it contains your API secret.
+
+personio:
+  # Base URL for the Personio API. Leave as-is unless told otherwise.
+  base_url: "https://api.personio.de"
+
+  # API credentials from Personio: Settings > Integrations > API credentials.
+  # Leave these blank while running in mock mode.
+  client_id: ""
+  client_secret: ""
+
+export:
+  # Folder where the CSV files are written. Created automatically if missing.
+  output_dir: "./output"
+
+  # Output file names (schema is fixed by the payroll/reporting requirement).
+  employee_file: "personio_employee_export.csv"
+  summary_file: "department_summary.csv"
+
+# When true, the tool uses bundled sample data instead of calling Personio.
+# Great for a first run or a demo when you don't have credentials yet.
+use_mock_data: true

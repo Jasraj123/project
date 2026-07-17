@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# Development-only tooling (linting/formatting). Not needed to run the export.
+ruff==0.15.22

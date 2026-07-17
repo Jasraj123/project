@@ -1,0 +1,11 @@
+# Secrets - never commit real credentials
+config.yaml
+
+# Generated output
+output/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
