@@ -1,8 +1,4 @@
-"""End-to-end smoke test: run the whole pipeline in mock mode.
-
-This exercises config loading, the (mock) extract, transform, CSV writing and the
-run report together, and asserts the two output files are produced correctly.
-"""
+"""End-to-end smoke test: run the whole pipeline in mock mode."""
 
 import csv
 import os
@@ -42,7 +38,6 @@ class EndToEndMockTests(unittest.TestCase):
                 reader = csv.DictReader(handle)
                 self.assertEqual(reader.fieldnames, CSV_COLUMNS)
                 rows = list(reader)
-            # Six bundled sample employees; the internal _currency key must not leak.
             self.assertEqual(len(rows), 6)
             self.assertNotIn("_currency", rows[0])
 

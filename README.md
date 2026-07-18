@@ -46,12 +46,26 @@ python run_export.py
 
 You'll get both CSV files in `output/` using the bundled sample employees.
 
-To make a demo look like a real company, set `mock_employee_count` in
-`config.yaml` (e.g. `2000`) and run again — the tool then generates a seeded,
-realistic synthetic workforce spanning many departments, several
-countries/currencies and mixed salary intervals, so the CSV, the department
-summary, the data-quality report and the mixed-currency warning all have
-meaningful data to show. Still no credentials or API calls required.
+To make a demo look like a real company, generate a larger synthetic workforce
+spanning many departments, several countries/currencies and mixed salary
+intervals — so the CSV, the department summary, the data-quality report and the
+mixed-currency warning all have meaningful data to show (no credentials needed):
+
+```bash
+python run_export.py --mock 2000
+```
+
+### Switching modes without editing files
+
+The same setup can be flipped between real data and a demo with command-line
+flags (they override `use_mock_data` in the config):
+
+```bash
+python run_export.py            # uses config.yaml (mock by default)
+python run_export.py --live     # real Personio data (needs .env credentials)
+python run_export.py --mock 2000  # 2,000 synthetic employees (scale demo)
+python run_export.py --mock 0   # the small built-in 6-employee sample
+```
 
 ## Running against real Personio data
 
@@ -194,7 +208,7 @@ python -m unittest
 ## Development
 
 Linting/formatting uses [ruff](https://docs.astral.sh/ruff/) (config in
-`pyproject.toml`). Install the dev tooling and run the same checks CI runs:
+`pyproject.toml`):
 
 ```bash
 pip install -r requirements-dev.txt
@@ -202,9 +216,6 @@ ruff check .            # lint
 ruff format --check .   # formatting
 python -m unittest      # tests
 ```
-
-Every push and pull request runs these on Python 3.9 and 3.11 via GitHub Actions
-(`.github/workflows/ci.yml`).
 
 ## Troubleshooting
 

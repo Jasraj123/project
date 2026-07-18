@@ -1,10 +1,4 @@
-"""Tests for the synthetic company generator used in mock mode for demos.
-
-These make sure the generated data is reproducible and actually contains the
-variety a realistic demo (and the transform/report code) relies on: the full
-schema, terminated staff, data gaps, annualised salaries and the mixed-currency
-case in the international departments.
-"""
+"""Tests for the synthetic company generator."""
 
 import unittest
 
@@ -44,7 +38,6 @@ class GeneratorBasicsTests(unittest.TestCase):
 
 class GeneratorTransformTests(unittest.TestCase):
     def setUp(self):
-        # A fixed seed keeps these assertions deterministic.
         self.rows = build_employee_rows(generate_sample_employees(500, seed=42))
 
     def test_every_row_has_the_full_csv_schema(self):

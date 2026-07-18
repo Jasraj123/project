@@ -1,18 +1,8 @@
-"""Bundled sample employees used when use_mock_data is true.
+"""Sample employee data for mock mode.
 
-The structure intentionally mirrors the real Personio v1 Employee response
-(nested {"label", "value"} attributes) so the same transform logic works
-against live data without changes. It includes a terminated employee and some
-missing fields on purpose, to show how those cases are handled.
-
-Two sources are provided:
-  * get_sample_employees()      - a small, fixed 6-record set used by the unit
-                                  tests (deterministic and easy to eyeball).
-  * generate_sample_employees() - a larger, seeded synthetic company (e.g. the
-                                  brief's ~2,000 employees) for a realistic demo:
-                                  many departments, several countries/currencies,
-                                  mixed salary intervals, terminated staff and a
-                                  sprinkling of missing fields.
+Records mirror the Personio v1 response shape so the same transform runs on them.
+get_sample_employees() returns a fixed 6-record set (used by tests);
+generate_sample_employees() builds a larger seeded synthetic company for demos.
 """
 
 from __future__ import annotations
@@ -23,7 +13,6 @@ from typing import Any
 
 
 def _nested(type_name: str, name: str) -> dict[str, Any]:
-    """Build a nested reference object (department, team, office, ...)."""
     return {"value": {"type": type_name, "attributes": {"name": name}}}
 
 
@@ -40,8 +29,6 @@ def _supervisor(first: str, last: str) -> dict[str, Any]:
 
 
 def _employee(**attributes: Any) -> dict[str, Any]:
-    # All sample offices are in the euro zone, so default the salary currency to
-    # EUR (mirrors the real API, which returns fix_salary_currency per employee).
     attributes.setdefault("fix_salary_currency", {"value": "EUR"})
     return {"type": "Employee", "attributes": attributes}
 
@@ -104,7 +91,7 @@ def get_sample_employees() -> list[dict[str, Any]]:
             weekly_working_hours={"value": "32"},
             employment_type={"value": "internal"},
             cost_centers={"value": [{"attributes": {"name": "CC-People"}}]},
-            # Stored monthly in Personio; the export normalises this to 54000/year.
+            # Monthly amount; annualised to 54000 by the transform.
             fix_salary={"value": 4500},
             fix_salary_interval={"value": "monthly"},
             last_modified_at={"value": "2024-09-30T11:45:00+02:00"},
@@ -129,7 +116,7 @@ def get_sample_employees() -> list[dict[str, Any]]:
             fix_salary_interval={"value": "yearly"},
             last_modified_at={"value": "2024-11-01T08:00:00+01:00"},
         ),
-        # Terminated employee - shows Termination date populated.
+        # Terminated employee.
         _employee(
             id={"value": 5},
             first_name={"value": "Ewan"},
@@ -150,7 +137,7 @@ def get_sample_employees() -> list[dict[str, Any]]:
             fix_salary_interval={"value": "yearly"},
             last_modified_at={"value": "2024-07-01T16:30:00+02:00"},
         ),
-        # Employee with several missing fields - shows blanks are handled safely.
+        # Employee with several missing fields.
         _employee(
             id={"value": 6},
             first_name={"value": "Farah"},
@@ -175,11 +162,9 @@ def get_sample_employees() -> list[dict[str, Any]]:
 
 
 # --------------------------------------------------------------------------- #
-# Synthetic company generator (for a realistic large-scale demo)
+# Synthetic company generator
 # --------------------------------------------------------------------------- #
 
-# Offices and the salary currency each one pays in. Most of the company sits in
-# the euro zone, so most departments have clean, comparable average salaries.
 _EUR_OFFICES = [
     ("Berlin", "EUR"),
     ("Munich", "EUR"),
@@ -188,15 +173,11 @@ _EUR_OFFICES = [
     ("Dublin", "EUR"),
 ]
 
-# A couple of teams are international and span currency zones. Those departments
-# will (realistically) mix currencies - exactly the case the export's
-# mixed-currency warning is designed to catch, without making every average
-# meaningless.
+# Only the international departments draw from these, so they mix currencies.
 _INTERNATIONAL_OFFICES = _EUR_OFFICES + [("London", "GBP"), ("New York", "USD")]
 _INTERNATIONAL_DEPARTMENTS = {"Sales", "Customer Success"}
 
-# Departments -> the teams that sit inside them, plus a rough annual base salary
-# (in local currency) used as the midpoint for that department.
+# Department -> its teams and a midpoint annual base salary.
 _DEPARTMENTS: dict[str, dict[str, Any]] = {
     "Engineering": {"teams": ["Platform", "Frontend", "Backend", "Data", "SRE"], "base": 72000},
     "Product": {"teams": ["Core", "Growth", "Design"], "base": 78000},
@@ -220,8 +201,8 @@ _POSITIONS = [
     "Director",
 ]
 
-_EMPLOYMENT_TYPES = ["internal", "internal", "internal", "external"]  # weighted
-_WEEKLY_HOURS = ["40", "40", "40", "32", "20"]  # weighted toward full-time
+_EMPLOYMENT_TYPES = ["internal", "internal", "internal", "external"]
+_WEEKLY_HOURS = ["40", "40", "40", "32", "20"]
 
 _FIRST_NAMES = [
     "Alex", "Bianca", "Chen", "Diana", "Ewan", "Farah", "Georg", "Hana", "Ivan",
@@ -238,26 +219,20 @@ _LAST_NAMES = [
 
 
 def _iso(day: date) -> str:
-    """Format a date the way Personio does (midnight, with a TZ offset)."""
     return f"{day.isoformat()}T00:00:00+01:00"
 
 
 def generate_sample_employees(count: int = 2000, seed: int = 42) -> list[dict[str, Any]]:
-    """Generate a realistic synthetic company of ``count`` employees.
+    """Generate a seeded synthetic company of ``count`` employees.
 
-    The output mirrors the real Personio v1 shape (so the same transform runs on
-    it) and deliberately includes variety a demo benefits from: many departments,
-    several countries/currencies, monthly *and* yearly salary intervals, ~7%
-    terminated staff, and a small share of missing emails/salaries so the
-    data-quality report and mixed-currency warning have something real to show.
-
-    A fixed ``seed`` makes every run reproducible.
+    Mirrors the Personio v1 shape and mixes departments, currencies, salary
+    intervals, terminated staff and some missing fields. The seed makes it
+    reproducible.
     """
     rng = random.Random(seed)
     dept_names = list(_DEPARTMENTS)
     today = date.today()
 
-    # A small pool of supervisors so reporting lines look believable.
     supervisors = [
         (rng.choice(_FIRST_NAMES), rng.choice(_LAST_NAMES)) for _ in range(max(count // 40, 5))
     ]
@@ -270,31 +245,24 @@ def generate_sample_employees(count: int = 2000, seed: int = 42) -> list[dict[st
         department = rng.choice(dept_names)
         dept = _DEPARTMENTS[department]
         team = rng.choice(dept["teams"])
-        # International teams draw from all offices (so they mix currencies);
-        # every other department stays within the euro zone.
         if department in _INTERNATIONAL_DEPARTMENTS:
             office, currency = rng.choice(_INTERNATIONAL_OFFICES)
         else:
             office, currency = rng.choice(_EUR_OFFICES)
         position = rng.choice(_POSITIONS)
 
-        # Salary: department midpoint scaled by a seniority factor, then rounded.
         annual = int(dept["base"] * rng.uniform(0.8, 2.3) / 500) * 500
-        # ~25% of people are stored as a monthly amount (exercises normalisation).
         if rng.random() < 0.25:
             interval = "monthly"
             salary_value: Any = round(annual / 12)
         else:
             interval = "yearly"
             salary_value = annual
-        # ~2% have no salary recorded (a real data gap).
         if rng.random() < 0.02:
             salary_value = None
             interval = None
 
-        # Tenure: hired sometime in the last ~10 years.
         hire_day = today - timedelta(days=rng.randint(30, 365 * 10))
-        # ~7% have left the company.
         terminated = rng.random() < 0.07
         if terminated:
             status = "inactive"
@@ -306,12 +274,10 @@ def generate_sample_employees(count: int = 2000, seed: int = 42) -> list[dict[st
             status = "active"
             termination_date = None
 
-        # ~3% have no email on file.
         email: Any = None
         if rng.random() >= 0.03:
             email = f"{first}.{last}{i}@example.com".lower()
 
-        # ~5% have no team; ~5% have no supervisor recorded.
         team_ref = _nested("Team", team) if rng.random() >= 0.05 else {"value": None}
         if rng.random() >= 0.05:
             sup_first, sup_last = rng.choice(supervisors)

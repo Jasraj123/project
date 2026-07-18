@@ -1,9 +1,4 @@
-"""Build a short run summary and data-quality report.
-
-After every export we tell the user how many records were processed and flag any
-gaps in the data (missing email, department or salary). This gives a customer
-confidence in each run and makes problems easy to spot early.
-"""
+"""Build a run summary and flag data-quality gaps (missing email/department/salary)."""
 
 from __future__ import annotations
 
@@ -26,7 +21,6 @@ class RunReport:
 
 
 def build_run_report(rows: list[dict[str, Any]]) -> RunReport:
-    """Count totals and data-quality gaps across the exported rows."""
     total = len(rows)
     active = sum(1 for r in rows if str(r.get("status", "")).lower() == "active")
     inactive = total - active
@@ -47,7 +41,6 @@ def build_run_report(rows: list[dict[str, Any]]) -> RunReport:
 
 
 def print_run_report(report: RunReport) -> None:
-    """Print the run summary; warn (don't fail) when data gaps are found."""
     print("\nRun summary")
     print("-" * 52)
     print(f"  Employees exported : {report.total}")

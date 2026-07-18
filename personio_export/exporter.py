@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 def _write_csv(path: str, columns: list[str], rows: list[dict[str, Any]]) -> None:
-    """Write rows to a UTF-8 CSV file, creating parent folders as needed."""
     directory = os.path.dirname(path) or "."
     try:
         os.makedirs(directory, exist_ok=True)
@@ -20,8 +19,7 @@ def _write_csv(path: str, columns: list[str], rows: list[dict[str, Any]]) -> Non
 
     try:
         with open(path, "w", newline="", encoding="utf-8") as handle:
-            # extrasaction="ignore" lets rows carry internal helper keys (e.g.
-            # "_currency") that aren't part of the CSV schema without erroring.
+            # extrasaction="ignore" drops non-schema keys like "_currency".
             writer = csv.DictWriter(handle, fieldnames=columns, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(rows)

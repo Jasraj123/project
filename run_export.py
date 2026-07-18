@@ -38,7 +38,6 @@ def _setup_logging() -> None:
 
 
 def _get_raw_employees(config: Config) -> list[dict]:
-    """Fetch employees from the API, or return sample data in mock mode."""
     if config.use_mock_data:
         if config.mock_employee_count > 0:
             logger.info(
@@ -58,7 +57,6 @@ def _get_raw_employees(config: Config) -> list[dict]:
 
 
 def _print_summary(summary_rows: list[dict]) -> None:
-    """Print the department summary to the console for a quick glance."""
     print("\nDepartment summary")
     print("-" * 52)
     print(f"{'department':<24}{'count':>8}{'avg base salary':>20}")
@@ -69,12 +67,27 @@ def _print_summary(summary_rows: list[dict]) -> None:
     print("-" * 52)
 
 
-def run(config_path: str) -> int:
+def run(config_path: str, force_mock: bool | None = None, mock_count: int | None = None) -> int:
     try:
         config = load_config(config_path)
     except ConfigError as exc:
         logger.error("Configuration problem: %s", exc)
         return 1
+
+    # --live / --mock override the config file.
+    if force_mock is True:
+        config.use_mock_data = True
+        if mock_count is not None:
+            config.mock_employee_count = mock_count
+    elif force_mock is False:
+        config.use_mock_data = False
+        if not config.client_id or not config.client_secret:
+            logger.error(
+                "--live requires API credentials. Set PERSONIO_CLIENT_ID and "
+                "PERSONIO_CLIENT_SECRET in .env (or client_id/client_secret in "
+                "config.yaml)."
+            )
+            return 1
 
     try:
         raw_employees = _get_raw_employees(config)
@@ -108,10 +121,34 @@ def main() -> None:
         default="config.yaml",
         help="Path to the YAML config file (default: config.yaml).",
     )
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--live",
+        action="store_true",
+        help="Force live mode (call the Personio API), ignoring use_mock_data in the config.",
+    )
+    mode.add_argument(
+        "--mock",
+        nargs="?",
+        const=-1,
+        type=int,
+        metavar="N",
+        help="Force mock mode. Optionally give a number of synthetic employees "
+        "to generate (e.g. --mock 2000). --mock 0 uses the small built-in sample.",
+    )
     args = parser.parse_args()
 
+    force_mock: bool | None = None
+    mock_count: int | None = None
+    if args.live:
+        force_mock = False
+    elif args.mock is not None:
+        force_mock = True
+        if args.mock >= 0:
+            mock_count = args.mock
+
     _setup_logging()
-    sys.exit(run(args.config))
+    sys.exit(run(args.config, force_mock=force_mock, mock_count=mock_count))
 
 
 if __name__ == "__main__":

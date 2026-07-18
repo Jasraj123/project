@@ -1,8 +1,4 @@
-"""Tests for the API client: authentication, pagination and error handling.
-
-These cover the parts most likely to break against a real (large) tenant, so
-they use a fake `requests.request` instead of hitting the network.
-"""
+"""Tests for the API client: authentication, pagination and error handling."""
 
 import unittest
 from unittest.mock import Mock, patch

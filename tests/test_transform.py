@@ -1,9 +1,4 @@
-"""Unit tests for the transform logic (the trickiest part of the tool).
-
-Run with either:
-    python -m unittest
-    pytest
-"""
+"""Unit tests for the transform logic."""
 
 import logging
 import unittest
@@ -18,12 +13,10 @@ from personio_export.transform import (
 
 
 def _attr(value):
-    """Wrap a value the way the Personio API does: {"value": ...}."""
     return {"value": value}
 
 
 def _ref(name):
-    """A nested reference object (department/team/office/...)."""
     return {"value": {"attributes": {"name": name}}}
 
 
@@ -146,7 +139,6 @@ class DepartmentSummaryTests(unittest.TestCase):
             {"department": "Sales", "Base Salary": ""},
         ]
         summary = build_department_summary(rows)[0]
-        # Two people counted, but the average uses only the one real salary.
         self.assertEqual(summary["employee_count"], 2)
         self.assertEqual(summary["average_base_salary"], 60000.0)
 
@@ -172,8 +164,7 @@ class DepartmentSummaryTests(unittest.TestCase):
         ]
         logger = logging.getLogger("personio_export.transform")
         with self.assertLogs(logger, level="WARNING") as logs:
-            # Emit one record so assertLogs has something even if no warning fires.
-            logger.warning("sentinel")
+            logger.warning("sentinel")  # assertLogs needs at least one record
             build_department_summary(rows)
         self.assertFalse(any("mixes salary currencies" in m for m in logs.output))
 

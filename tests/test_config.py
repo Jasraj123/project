@@ -1,8 +1,4 @@
-"""Tests for configuration loading: .env support and env-var precedence.
-
-These verify that secrets can live in the environment (a .env file) and that
-they correctly override config.yaml, without requiring credentials in mock mode.
-"""
+"""Tests for configuration loading: .env support and env-var precedence."""
 
 import os
 import tempfile
@@ -17,7 +13,7 @@ _ENV_KEYS = ["PERSONIO_CLIENT_ID", "PERSONIO_CLIENT_SECRET", "PERSONIO_BASE_URL"
 
 
 class _CleanEnv(unittest.TestCase):
-    """Save/restore the PERSONIO_* env vars so tests don't leak into each other."""
+    """Save/restore the PERSONIO_* env vars between tests."""
 
     def setUp(self):
         self._saved = {key: os.environ.get(key) for key in _ENV_KEYS}
@@ -49,9 +45,7 @@ def _write_config(dir_path, personio, use_mock_data):
 class ConfigEnvPrecedenceTests(_CleanEnv):
     def setUp(self):
         super().setUp()
-        # Isolate these tests from any real project-root .env file: here we test
-        # load_config's precedence logic against a controlled environment only.
-        # (.env file parsing itself is covered by LoadDotenvTests below.)
+        # Ignore any real project-root .env so these tests control the environment.
         patcher = patch("personio_export.config.load_dotenv", lambda *a, **k: None)
         patcher.start()
         self.addCleanup(patcher.stop)

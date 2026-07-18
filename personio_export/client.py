@@ -1,12 +1,7 @@
-"""Talk to the Personio API: authenticate, then fetch employees.
+"""Personio API client: authenticate, then fetch employees.
 
-We use the Personio v1 Employee endpoint because a single call returns all the
-fields this export needs (master data, employment details and fixed salary),
-which keeps the integration simple and easy to maintain.
-
-Two robustness features matter for real customers:
-  * Pagination  - large companies (e.g. 2,000 employees) are fetched in batches.
-  * Retry/backoff - transient errors and rate limits are retried automatically.
+Uses the v1 employee endpoint, with pagination for large companies and
+automatic retries on transient errors.
 """
 
 from __future__ import annotations
@@ -19,16 +14,13 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# How many employees to request per page. Personio enforces a maximum of 100 on
-# the v1 employees endpoint (a higher value is rejected with HTTP 422).
+# Personio caps the v1 employees endpoint at 100 records per page (422 above it).
 PAGE_SIZE = 100
 
-# Retry behaviour for transient failures (rate limits and 5xx server errors).
 MAX_RETRIES = 3
 RETRY_BACKOFF_SECONDS = 2  # doubles each attempt: 2s, 4s, 8s
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
-# Safety cap so a misbehaving API can never cause an infinite paging loop.
 MAX_PAGES = 1000
 
 
@@ -45,7 +37,6 @@ class PersonioClient:
         self._token: str | None = None
 
     def _request_with_retry(self, method: str, url: str, **kwargs: Any) -> requests.Response:
-        """Send a request, retrying transient errors with exponential backoff."""
         last_error = ""
         for attempt in range(1, MAX_RETRIES + 1):
             try:
@@ -73,7 +64,6 @@ class PersonioClient:
         )
 
     def authenticate(self) -> None:
-        """Exchange the client credentials for a bearer token."""
         if not self._client_id or not self._client_secret:
             raise PersonioAPIError("API token missing: client_id/client_secret not set.")
 
@@ -101,7 +91,6 @@ class PersonioClient:
         logger.info("Authentication successful.")
 
     def fetch_employees(self) -> list[dict[str, Any]]:
-        """Return all employees, fetching page by page so large companies work."""
         if not self._token:
             raise PersonioAPIError("Not authenticated. Call authenticate() first.")
 
@@ -137,7 +126,6 @@ class PersonioClient:
             batch = body.get("data", [])
             employees.extend(batch)
 
-            # Prefer the API's own paging metadata; fall back to page length.
             total_pages = (body.get("metadata") or {}).get("total_pages")
             if total_pages is not None:
                 if offset // PAGE_SIZE >= total_pages - 1:
@@ -145,7 +133,7 @@ class PersonioClient:
             elif len(batch) < PAGE_SIZE:
                 break
 
-            if not batch:  # defensive: never loop on an empty page
+            if not batch:
                 break
 
             offset += PAGE_SIZE

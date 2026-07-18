@@ -1,14 +1,6 @@
-"""Load and validate configuration from a YAML file (and, for secrets, a .env).
+"""Configuration loading from config.yaml, with secrets from a .env file.
 
-Keeping configuration in a file (never hard-coded) means a customer can set up
-the tool without touching the code, and secrets stay out of the source.
-
-Precedence for the API credentials and base URL:
-    environment variable  >  .env file  >  config.yaml  >  built-in default
-
-This lets non-secret settings live in a readable, committable ``config.yaml``
-while the secret credentials live only in a ``.env`` file (which is gitignored),
-following common security practice.
+Credential precedence: environment variable > .env > config.yaml > default.
 """
 
 from __future__ import annotations
@@ -27,12 +19,7 @@ class ConfigError(Exception):
 
 
 def load_dotenv(path: str = ".env") -> None:
-    """Load simple ``KEY=VALUE`` lines from a .env file into the environment.
-
-    Existing environment variables are never overwritten (a real shell variable
-    wins over the file). Blank lines and ``#`` comments are ignored, and inline
-    surrounding quotes are stripped. Kept dependency-free on purpose.
-    """
+    """Load KEY=VALUE lines from a .env file into os.environ (existing vars win)."""
     if not os.path.exists(path):
         return
     try:
@@ -43,7 +30,6 @@ def load_dotenv(path: str = ".env") -> None:
                     continue
                 key, _, value = stripped.partition("=")
                 key = key.strip()
-                # Allow an optional "export " prefix, as in shell env files.
                 if key.startswith("export "):
                     key = key[len("export ") :].strip()
                 value = value.strip().strip('"').strip("'")
@@ -66,14 +52,12 @@ class Config:
 
 
 def load_config(path: str) -> Config:
-    """Read the YAML config file and return a validated Config object."""
     if not os.path.exists(path):
         raise ConfigError(
             f"Config file not found at '{path}'. "
             "Copy config.example.yaml to config.yaml and fill it in."
         )
 
-    # Load .env first so its values are available as environment variables below.
     load_dotenv()
 
     with open(path, encoding="utf-8") as handle:
@@ -83,8 +67,6 @@ def load_config(path: str) -> Config:
     export = raw.get("export", {})
     use_mock_data = bool(raw.get("use_mock_data", False))
 
-    # Credentials and base URL may come from the environment (.env), which takes
-    # precedence over config.yaml so secrets can be kept out of the YAML file.
     base_url = (
         os.environ.get("PERSONIO_BASE_URL")
         or personio.get("base_url")
@@ -93,8 +75,6 @@ def load_config(path: str) -> Config:
     client_id = os.environ.get("PERSONIO_CLIENT_ID") or personio.get("client_id", "")
     client_secret = os.environ.get("PERSONIO_CLIENT_SECRET") or personio.get("client_secret", "")
 
-    # When >0 and running in mock mode, generate this many synthetic employees
-    # instead of using the small built-in sample (handy for a realistic demo).
     try:
         mock_employee_count = int(raw.get("mock_employee_count", 0) or 0)
     except (TypeError, ValueError):
@@ -116,15 +96,13 @@ def load_config(path: str) -> Config:
         mock_employee_count=mock_employee_count,
     )
 
-    # Only require credentials when we actually intend to call the API.
-    if not config.use_mock_data:
-        if not config.client_id or not config.client_secret:
-            raise ConfigError(
-                "API token missing: client_id and client_secret are required "
-                "when use_mock_data is false. Add PERSONIO_CLIENT_ID and "
-                "PERSONIO_CLIENT_SECRET to your .env file (or client_id/"
-                "client_secret to config.yaml), or set use_mock_data: true to "
-                "run with sample data."
-            )
+    if not config.use_mock_data and (not config.client_id or not config.client_secret):
+        raise ConfigError(
+            "API token missing: client_id and client_secret are required "
+            "when use_mock_data is false. Add PERSONIO_CLIENT_ID and "
+            "PERSONIO_CLIENT_SECRET to your .env file (or client_id/"
+            "client_secret to config.yaml), or set use_mock_data: true to "
+            "run with sample data."
+        )
 
     return config

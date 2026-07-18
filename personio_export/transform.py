@@ -1,9 +1,4 @@
-"""Turn raw Personio employee records into clean, flat rows for CSV output.
-
-Two outputs are produced:
-  1. One row per employee, matching the agreed CSV schema.
-  2. A per-department summary (headcount and average base salary).
-"""
+"""Turn raw Personio employee records into flat CSV rows and a department summary."""
 
 from __future__ import annotations
 
@@ -12,7 +7,6 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# CSV columns in the exact order required by the export schema.
 CSV_COLUMNS = [
     "employeeID",
     "First name",
@@ -37,14 +31,12 @@ SUMMARY_COLUMNS = ["department", "employee_count", "average_base_salary"]
 
 
 def _value(attribute: Any) -> Any:
-    """Return the inner 'value' of a Personio attribute, or the value itself."""
     if isinstance(attribute, dict):
         return attribute.get("value")
     return attribute
 
 
 def _nested_name(attribute: Any) -> str:
-    """Read the 'name' from a nested reference (department/team/office/...)."""
     value = _value(attribute)
     if isinstance(value, dict):
         return str(value.get("attributes", {}).get("name") or "")
@@ -52,7 +44,6 @@ def _nested_name(attribute: Any) -> str:
 
 
 def _supervisor_name(attribute: Any) -> str:
-    """Build 'First Last' from a nested supervisor employee object."""
     value = _value(attribute)
     if not isinstance(value, dict):
         return ""
@@ -63,7 +54,6 @@ def _supervisor_name(attribute: Any) -> str:
 
 
 def _cost_center_name(attribute: Any) -> str:
-    """Cost centers come back as a list; use the first one's name."""
     value = _value(attribute)
     if isinstance(value, list) and value:
         return str(value[0].get("attributes", {}).get("name") or "")
@@ -71,7 +61,6 @@ def _cost_center_name(attribute: Any) -> str:
 
 
 def _date_only(attribute: Any) -> str:
-    """Normalise a Personio date/timestamp to YYYY-MM-DD (blank if missing)."""
     value = _value(attribute)
     if not value:
         return ""
@@ -79,7 +68,6 @@ def _date_only(attribute: Any) -> str:
 
 
 def _text(attribute: Any) -> str:
-    """Return a stripped string, or blank if the value is missing."""
     value = _value(attribute)
     if value is None:
         return ""
@@ -87,7 +75,6 @@ def _text(attribute: Any) -> str:
 
 
 def _base_salary(attribute: Any) -> float | None:
-    """Return the raw base salary as a number, or None if not set."""
     value = _value(attribute)
     if value in (None, ""):
         return None
@@ -98,17 +85,13 @@ def _base_salary(attribute: Any) -> float | None:
         return None
 
 
-# Multipliers to convert a Personio salary interval to an annual gross figure.
-# Personio stores the amount in `fix_salary` and the period in `fix_salary_interval`.
 _ANNUAL_FACTOR = {"yearly": 1, "annually": 1, "annual": 1, "monthly": 12, "weekly": 52}
 
 
 def _annual_base_salary(salary_attr: Any, interval_attr: Any) -> float | None:
     """Normalise base salary to a yearly figure so departments are comparable.
 
-    Personio returns monthly amounts for most employees but yearly for some, so a
-    raw average would mix periods. We convert everything to annual gross using the
-    `fix_salary_interval` field; an unknown/blank interval is assumed to be annual.
+    An unknown or blank interval is treated as annual.
     """
     amount = _base_salary(salary_attr)
     if amount is None:
@@ -124,14 +107,10 @@ def _annual_base_salary(salary_attr: Any, interval_attr: Any) -> float | None:
 
 
 def build_employee_rows(raw_employees: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Map each raw employee record to a flat dict keyed by CSV column."""
     rows: list[dict[str, Any]] = []
 
     for record in raw_employees:
         attrs = record.get("attributes", {})
-        # Personio's v1 attribute is "fix_salary"; keep "fixed_salary" as a fallback.
-        # Normalise to an annual figure using the salary interval so the column and
-        # the department averages are comparable across employees.
         salary = _annual_base_salary(
             attrs.get("fix_salary") or attrs.get("fixed_salary"),
             attrs.get("fix_salary_interval") or attrs.get("salary_interval"),
@@ -157,8 +136,7 @@ def build_employee_rows(raw_employees: list[dict[str, Any]]) -> list[dict[str, A
                 "Cost center": _cost_center_name(attrs.get("cost_centers")),
                 "Base Salary": "" if salary is None else salary,
                 "Last modified": _date_only(attrs.get("last_modified_at")),
-                # Not part of the CSV schema; kept so the summary can detect a
-                # department whose salaries mix currencies. Ignored on CSV write.
+                # Internal only (not a CSV column); used to flag mixed-currency departments.
                 "_currency": currency,
             }
         )
@@ -168,7 +146,6 @@ def build_employee_rows(raw_employees: list[dict[str, Any]]) -> list[dict[str, A
 
 
 def build_department_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Aggregate headcount and average base salary per department."""
     totals: dict[str, dict[str, Any]] = {}
 
     for row in rows:
