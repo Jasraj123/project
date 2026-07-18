@@ -18,7 +18,7 @@ from personio_export.client import PersonioAPIError, PersonioClient
 from personio_export.config import Config, ConfigError, load_config
 from personio_export.exporter import write_employee_csv, write_summary_csv
 from personio_export.report import build_run_report, print_run_report
-from personio_export.sample_data import get_sample_employees
+from personio_export.sample_data import generate_sample_employees, get_sample_employees
 from personio_export.transform import (
     CSV_COLUMNS,
     SUMMARY_COLUMNS,
@@ -40,8 +40,15 @@ def _setup_logging() -> None:
 def _get_raw_employees(config: Config) -> list[dict]:
     """Fetch employees from the API, or return sample data in mock mode."""
     if config.use_mock_data:
-        logger.info("Running in MOCK mode - using bundled sample data (no API calls).")
-        employees = get_sample_employees()
+        if config.mock_employee_count > 0:
+            logger.info(
+                "Running in MOCK mode - generating %d synthetic employees (no API calls).",
+                config.mock_employee_count,
+            )
+            employees = generate_sample_employees(config.mock_employee_count)
+        else:
+            logger.info("Running in MOCK mode - using bundled sample data (no API calls).")
+            employees = get_sample_employees()
         logger.info("Fetched %d employees", len(employees))
         return employees
 

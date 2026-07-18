@@ -1,5 +1,7 @@
 # Secrets - never commit real credentials
 config.yaml
+.env
+!.env.example
 
 # Generated output
 output/

@@ -23,3 +23,8 @@ export:
 # When true, the tool uses bundled sample data instead of calling Personio.
 # Great for a first run or a demo when you don't have credentials yet.
 use_mock_data: true
+
+# Mock mode only: when >0, generate this many realistic synthetic employees
+# (many departments, several countries/currencies, mixed salary intervals) so a
+# demo looks like a real company. Leave at 0 to use the small built-in sample.
+mock_employee_count: 0

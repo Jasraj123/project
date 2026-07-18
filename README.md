@@ -46,6 +46,13 @@ python run_export.py
 
 You'll get both CSV files in `output/` using the bundled sample employees.
 
+To make a demo look like a real company, set `mock_employee_count` in
+`config.yaml` (e.g. `2000`) and run again — the tool then generates a seeded,
+realistic synthetic workforce spanning many departments, several
+countries/currencies and mixed salary intervals, so the CSV, the department
+summary, the data-quality report and the mixed-currency warning all have
+meaningful data to show. Still no credentials or API calls required.
+
 ## Running against real Personio data
 
 1. In Personio, go to **Settings > Integrations > API credentials** and
@@ -53,13 +60,28 @@ You'll get both CSV files in `output/` using the bundled sample employees.
    Employees and whitelist the employee attributes used in the CSV
    (name, email, status, hire/termination date, position, department, team,
    supervisor, office, weekly hours, employment type, cost center, fixed salary).
-2. Copy the **Client ID** and **Client Secret** into `config.yaml`.
-3. Set `use_mock_data: false`.
+2. Put the **Client ID** and **Client Secret** in a `.env` file (copy
+   `.env.example` to `.env` first) — this keeps the secret out of `config.yaml`:
+
+   ```bash
+   cp .env.example .env
+   # then edit .env:
+   # PERSONIO_CLIENT_ID="..."
+   # PERSONIO_CLIENT_SECRET="..."
+   ```
+
+   (Alternatively you can still put `client_id`/`client_secret` directly in
+   `config.yaml`; the `.env` values take precedence if both are set.)
+3. Set `use_mock_data: false` in `config.yaml`.
 4. Run it:
 
 ```bash
 python run_export.py
 ```
+
+Credentials are resolved in this order: **environment variable > `.env` file >
+`config.yaml` > default**, so secrets can live only in `.env` (which is
+gitignored) while non-secret settings stay in the readable `config.yaml`.
 
 ### Which API is used
 
@@ -103,6 +125,7 @@ All settings live in `config.yaml` (copied from `config.example.yaml`):
 | `export.output_dir` | Folder for the CSV files (created if missing). |
 | `export.employee_file` / `summary_file` | Output file names. |
 | `use_mock_data` | `true` = sample data, `false` = call the live API. |
+| `mock_employee_count` | Mock mode only. `0` = the small built-in sample; `>0` = generate that many realistic synthetic employees (e.g. `2000`) for a demo. |
 
 ## Running daily (scheduling)
 
