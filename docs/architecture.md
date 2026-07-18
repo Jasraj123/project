@@ -36,7 +36,9 @@ flowchart TD
 | **Extract** | `client.py` | Authenticate, then fetch all employees (paged, with retries). |
 | (demo) | `sample_data.py` | Provide realistic sample data when there are no credentials. |
 | **Transform** | `transform.py` | Flatten nested JSON into the CSV schema; build the department summary. |
-| **Load** | `exporter.py` | Write the two CSV files to the output folder. |
+| Extract (docs) | `documents.py` | v2 OAuth; list document metadata and optionally download files. |
+| **Load** | `exporter.py` | Write the CSV files to the output folder. |
+| Deliver | `delivery.py` | Send the output files onward (local / SFTP). |
 | Report | `report.py` | Print a run summary and flag data-quality gaps. |
 | Orchestrate | `run_export.py` | Wire the stages together, handle errors, set up logging. |
 
@@ -65,18 +67,25 @@ to a customer who may not be technical.*
 | **Mock mode built in** | Customer (or reviewer) succeeds on the first run with no credentials; the same transform code path is exercised. | A little extra code, but it doubles as a test fixture and a demo. |
 | **Plain `requests` + `unittest`, no framework** | Lean, no heavy dependencies for a customer to vet or install. | No async/parallel paging; fine at 2,000 employees, revisit only if latency matters. |
 
+## Beyond the core CSV (implemented)
+
+- **HR documents** - `documents.py` uses the Personio **v2** Document Management
+  API (OAuth 2.0, `documents:read` scope) to list document metadata into a
+  manifest and optionally download the files. It's a good illustration of the
+  v1-vs-v2 trade-off: employee data is simplest on v1, but documents only exist
+  on v2, so the tool speaks both. If the credential lacks the scope, the run
+  reports it clearly and still finishes the employee export.
+- **SFTP delivery** - `delivery.py` uploads the output files to an SFTP server
+  when configured; `local` stays the default. Delivery is pluggable, so email or
+  a cloud bucket is a single extra function.
+
 ## What I intentionally left out (and why)
 
 Scope discipline is part of the answer. These were conscious "not yet" calls, not
 oversights:
 
-- **Document exports** - the brief mentions HR *documents* alongside data. Those
-  come from a separate v1 documents endpoint and are a file-transfer concern, not a
-  CSV one; I scoped this iteration to the required employee data. The same
-  extract/load structure would host it (fetch document metadata, stream files to
-  the chosen destination) as a clear next step.
-- **SFTP / email / BI delivery** - the brief said "produce the CSV locally"; I kept
-  delivery pluggable rather than half-building three transports.
+- **Email / BI-warehouse delivery** - the delivery layer is pluggable; I built
+  the SFTP target the brief called out rather than half-building several.
 - **A scheduler** - every OS already has one (cron / Task Scheduler); shipping our
   own would be more to maintain and explain.
 - **Incremental sync** - a full daily export is simpler and correct for 2,000

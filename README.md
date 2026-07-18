@@ -128,6 +128,42 @@ as absences at scale). Because extract, transform and load are separate modules,
 switching means changing only `client.py` — the transform and CSV output stay
 the same.
 
+## Delivering the files (SFTP)
+
+Output files are always written locally first. Set `delivery.type: sftp` in
+`config.yaml` to also upload them to an SFTP server after each run:
+
+```yaml
+delivery:
+  type: "sftp"
+  sftp:
+    host: "sftp.example.com"
+    port: 22
+    username: "payroll"
+    remote_dir: "/incoming"
+    private_key_path: ""      # or set PERSONIO_SFTP_PASSWORD in .env
+```
+
+Delivery is pluggable: `local` (default) and `sftp` are built in, and a new
+target (email, cloud bucket) is a single function in `delivery.py`.
+
+## Exporting HR documents
+
+The brief also mentions documents. Document listing/download is a **v2 API**
+(`GET /v2/document-management/documents`) that uses OAuth 2.0 and a
+`documents:read` scope — separate from the v1 employee export. Enable it with:
+
+```yaml
+documents:
+  enabled: true
+  download_files: false   # false = metadata manifest only; true = also download files
+```
+
+The tool authenticates against v2, writes `documents_manifest.csv`, and (if
+`download_files` is true) saves each file under `output/documents/`. If the API
+credential lacks the `documents:read` scope, the tool logs a clear message and
+the employee export still completes.
+
 ## Configuration
 
 All settings live in `config.yaml` (copied from `config.example.yaml`):
@@ -140,6 +176,10 @@ All settings live in `config.yaml` (copied from `config.example.yaml`):
 | `export.employee_file` / `summary_file` | Output file names. |
 | `use_mock_data` | `true` = sample data, `false` = call the live API. |
 | `mock_employee_count` | Mock mode only. `0` = the small built-in sample; `>0` = generate that many realistic synthetic employees (e.g. `2000`) for a demo. |
+| `delivery.type` | `local` (default) or `sftp`. |
+| `delivery.sftp.*` | SFTP host/port/username/remote_dir/private_key_path (password via `PERSONIO_SFTP_PASSWORD`). |
+| `documents.enabled` | `true` to export HR documents via the v2 API (live mode). |
+| `documents.download_files` | `true` to download files too, not just the metadata manifest. |
 
 ## Running daily (scheduling)
 
@@ -181,25 +221,27 @@ docker run --rm \
 ```
 run_export.py              # CLI entry point (orchestrates the run)
 config.example.yaml        # template config; copy to config.yaml
+.env.example               # template for API/SFTP secrets; copy to .env
 requirements.txt
 Dockerfile
 docs/architecture.md       # architecture diagram + design notes
 personio_export/
-  config.py                # load & validate config
-  client.py                # authenticate + fetch employees (paginate + retry)
+  config.py                # load & validate config (+ .env secrets)
+  client.py                # v1 auth + fetch employees (paginate + retry)
   transform.py             # JSON -> CSV rows + department summary
+  documents.py             # v2 auth + document metadata/download
   exporter.py              # write CSV files
+  delivery.py              # local / SFTP delivery
   report.py                # run summary + data-quality checks
-  sample_data.py           # bundled sample data for mock mode
-tests/
-  test_transform.py        # unit tests for the transform logic
+  sample_data.py           # sample + synthetic data for mock mode
+tests/                     # unit + end-to-end tests (unittest)
 ```
 
 See `docs/architecture.md` for a diagram of how the pieces fit together.
 
 ## Running the tests
 
-No extra packages needed - the tests use Python's built-in `unittest`:
+The tests use Python's built-in `unittest` (no server or network needed):
 
 ```bash
 python -m unittest

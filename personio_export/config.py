@@ -49,6 +49,17 @@ class Config:
     summary_file: str
     use_mock_data: bool
     mock_employee_count: int
+    delivery_type: str = "local"
+    sftp_host: str = ""
+    sftp_port: int = 22
+    sftp_username: str = ""
+    sftp_remote_dir: str = "."
+    sftp_private_key_path: str = ""
+    sftp_password: str = ""
+    documents_enabled: bool = False
+    documents_download_files: bool = False
+    documents_manifest_file: str = "documents_manifest.csv"
+    documents_subdir: str = "documents"
 
 
 def load_config(path: str) -> Config:
@@ -85,6 +96,10 @@ def load_config(path: str) -> Config:
     if mock_employee_count < 0:
         raise ConfigError("mock_employee_count cannot be negative.")
 
+    delivery = raw.get("delivery", {})
+    sftp = delivery.get("sftp", {})
+    documents = raw.get("documents", {})
+
     config = Config(
         base_url=base_url.rstrip("/"),
         client_id=client_id,
@@ -94,6 +109,17 @@ def load_config(path: str) -> Config:
         summary_file=export.get("summary_file", "department_summary.csv"),
         use_mock_data=use_mock_data,
         mock_employee_count=mock_employee_count,
+        delivery_type=str(delivery.get("type", "local")),
+        sftp_host=sftp.get("host", ""),
+        sftp_port=int(sftp.get("port", 22) or 22),
+        sftp_username=sftp.get("username", ""),
+        sftp_remote_dir=sftp.get("remote_dir", "."),
+        sftp_private_key_path=sftp.get("private_key_path", ""),
+        sftp_password=os.environ.get("PERSONIO_SFTP_PASSWORD", ""),
+        documents_enabled=bool(documents.get("enabled", False)),
+        documents_download_files=bool(documents.get("download_files", False)),
+        documents_manifest_file=documents.get("manifest_file", "documents_manifest.csv"),
+        documents_subdir=documents.get("subdir", "documents"),
     )
 
     if not config.use_mock_data and (not config.client_id or not config.client_secret):

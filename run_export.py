@@ -12,11 +12,24 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 
 from personio_export.client import PersonioAPIError, PersonioClient
 from personio_export.config import Config, ConfigError, load_config
-from personio_export.exporter import write_employee_csv, write_summary_csv
+from personio_export.delivery import DeliveryError, deliver
+from personio_export.documents import (
+    DOCUMENT_MANIFEST_COLUMNS,
+    DocumentAPIError,
+    authenticate_v2,
+    build_document_manifest,
+    fetch_all_document_metadata,
+)
+from personio_export.exporter import (
+    write_documents_manifest,
+    write_employee_csv,
+    write_summary_csv,
+)
 from personio_export.report import build_run_report, print_run_report
 from personio_export.sample_data import generate_sample_employees, get_sample_employees
 from personio_export.transform import (
@@ -54,6 +67,17 @@ def _get_raw_employees(config: Config) -> list[dict]:
     client = PersonioClient(config.base_url, config.client_id, config.client_secret)
     client.authenticate()
     return client.fetch_employees()
+
+
+def _export_documents(config: Config, employee_rows: list[dict]) -> list[dict]:
+    logger.info("Documents: authenticating with the Personio v2 API...")
+    token = authenticate_v2(config.base_url, config.client_id, config.client_secret)
+    owner_ids = [row["employeeID"] for row in employee_rows if row.get("employeeID")]
+    docs = fetch_all_document_metadata(config.base_url, token, owner_ids)
+    download_dir = None
+    if config.documents_download_files:
+        download_dir = os.path.join(config.output_dir, config.documents_subdir)
+    return build_document_manifest(docs, config.base_url, token, download_dir)
 
 
 def _print_summary(summary_rows: list[dict]) -> None:
@@ -102,10 +126,39 @@ def run(config_path: str, force_mock: bool | None = None, mock_count: int | None
     summary_rows = build_department_summary(employee_rows)
 
     try:
-        write_employee_csv(config.output_dir, config.employee_file, CSV_COLUMNS, employee_rows)
-        write_summary_csv(config.output_dir, config.summary_file, SUMMARY_COLUMNS, summary_rows)
+        employee_path = write_employee_csv(
+            config.output_dir, config.employee_file, CSV_COLUMNS, employee_rows
+        )
+        summary_path = write_summary_csv(
+            config.output_dir, config.summary_file, SUMMARY_COLUMNS, summary_rows
+        )
     except OSError as exc:
         logger.error("Could not write output: %s", exc)
+        return 1
+
+    output_files = [employee_path, summary_path]
+
+    if config.documents_enabled:
+        if config.use_mock_data:
+            logger.info("Documents: skipped in mock mode (needs live v2 API access).")
+        else:
+            try:
+                doc_rows = _export_documents(config, employee_rows)
+                output_files.append(
+                    write_documents_manifest(
+                        config.output_dir,
+                        config.documents_manifest_file,
+                        DOCUMENT_MANIFEST_COLUMNS,
+                        doc_rows,
+                    )
+                )
+            except (DocumentAPIError, OSError) as exc:
+                logger.warning("Documents: skipped (%s)", exc)
+
+    try:
+        deliver(output_files, config)
+    except DeliveryError as exc:
+        logger.error("Delivery failed: %s", exc)
         return 1
 
     _print_summary(summary_rows)

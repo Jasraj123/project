@@ -43,3 +43,12 @@ def write_summary_csv(
     _write_csv(path, columns, rows)
     logger.info("Department summary written: %s (%d rows)", path, len(rows))
     return path
+
+
+def write_documents_manifest(
+    output_dir: str, filename: str, columns: list[str], rows: list[dict[str, Any]]
+) -> str:
+    path = os.path.join(output_dir, filename)
+    _write_csv(path, columns, rows)
+    logger.info("Document manifest written: %s (%d rows)", path, len(rows))
+    return path

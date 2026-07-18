@@ -28,3 +28,22 @@ use_mock_data: true
 # (many departments, several countries/currencies, mixed salary intervals) so a
 # demo looks like a real company. Leave at 0 to use the small built-in sample.
 mock_employee_count: 0
+
+# Where to deliver the output files. Files are always written locally first.
+#   type: local  -> leave them in the output folder (default)
+#   type: sftp   -> also upload them to an SFTP server
+delivery:
+  type: "local"
+  sftp:
+    host: ""
+    port: 22
+    username: ""
+    remote_dir: "."
+    # Auth: set PERSONIO_SFTP_PASSWORD in .env, or point to a private key here.
+    private_key_path: ""
+
+# HR document export (live mode only). Uses the Personio v2 Document Management
+# API, which needs the 'documents:read' scope on your API credential.
+documents:
+  enabled: false
+  download_files: false   # false = metadata manifest only; true = also download files
