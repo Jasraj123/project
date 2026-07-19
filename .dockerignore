@@ -1,0 +1,36 @@
+# Keep the build context small - the image only needs requirements.txt,
+# personio_export/ and run_export.py (see Dockerfile).
+
+# Version control
+.git
+.gitignore
+
+# Presentation & docs (not needed at runtime)
+*.pptx
+docs/
+*.md
+PRESENTATION_CONTENT.md
+
+# Secrets, local config and generated output
+.env
+.env.example
+config.yaml
+config.example.yaml
+output/
+
+# Python caches / virtualenvs
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Tests & dev-only tooling
+tests/
+requirements-dev.txt
+pyproject.toml
+
+# OS junk
+.DS_Store
+
+# Confidential case brief
+Customer Integration Specialist - Case Pr.pdf

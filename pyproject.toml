@@ -9,6 +9,10 @@ dependencies = [
     "python-dotenv==1.0.1",
 ]
 
+[project.optional-dependencies]
+# Only needed when delivery.type is "sftp".
+sftp = ["paramiko>=3.4,<4"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py39"
