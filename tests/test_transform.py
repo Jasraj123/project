@@ -59,6 +59,14 @@ class SalaryNormalizationTests(unittest.TestCase):
     def test_missing_salary_is_none(self):
         self.assertIsNone(_annual_base_salary(_attr(None), _attr("monthly")))
 
+    def test_zero_salary_is_none(self):
+        # A 0 (intern/unset field) is not a real pay figure, so it's left blank.
+        self.assertIsNone(_annual_base_salary(_attr(0), _attr("monthly")))
+        self.assertIsNone(_annual_base_salary(_attr("0"), _attr("yearly")))
+
+    def test_negative_salary_is_none(self):
+        self.assertIsNone(_annual_base_salary(_attr(-1000), _attr("monthly")))
+
     def test_row_uses_interval(self):
         record = {
             "type": "Employee",
@@ -112,6 +120,19 @@ class EmployeeRowTests(unittest.TestCase):
         self.assertEqual(row["email"], "")
         self.assertEqual(row["department"], "")
         self.assertEqual(row["Base Salary"], "")
+
+    def test_malformed_records_do_not_crash(self):
+        # A stray non-dict cost center or a null nested object shouldn't kill the run.
+        records = [
+            {"attributes": {"id": _attr(1), "cost_centers": _attr(["oops"])}},
+            {"attributes": {"id": _attr(2), "department": {"value": {"attributes": None}}}},
+            {"attributes": {"id": _attr(3), "supervisor": {"value": "not-a-dict"}}},
+        ]
+        rows = build_employee_rows(records)
+        self.assertEqual([r["employeeID"] for r in rows], ["1", "2", "3"])
+        self.assertEqual(rows[0]["Cost center"], "")
+        self.assertEqual(rows[1]["department"], "")
+        self.assertEqual(rows[2]["Supervisor name"], "")
 
     def test_legacy_fixed_salary_key_still_works(self):
         record = self._sample_record()

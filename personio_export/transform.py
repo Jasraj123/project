@@ -36,18 +36,20 @@ def _value(attribute: Any) -> Any:
     return attribute
 
 
+def _attributes(value: Any) -> dict[str, Any]:
+    """The nested 'attributes' dict of a related object, or {} if it's missing
+    or malformed - so a stray record can't crash the whole export."""
+    if isinstance(value, dict) and isinstance(value.get("attributes"), dict):
+        return value["attributes"]
+    return {}
+
+
 def _nested_name(attribute: Any) -> str:
-    value = _value(attribute)
-    if isinstance(value, dict):
-        return str(value.get("attributes", {}).get("name") or "")
-    return ""
+    return str(_attributes(_value(attribute)).get("name") or "")
 
 
 def _supervisor_name(attribute: Any) -> str:
-    value = _value(attribute)
-    if not isinstance(value, dict):
-        return ""
-    attrs = value.get("attributes", {})
+    attrs = _attributes(_value(attribute))
     first = _value(attrs.get("first_name")) or ""
     last = _value(attrs.get("last_name")) or ""
     return f"{first} {last}".strip()
@@ -56,7 +58,7 @@ def _supervisor_name(attribute: Any) -> str:
 def _cost_center_name(attribute: Any) -> str:
     value = _value(attribute)
     if isinstance(value, list) and value:
-        return str(value[0].get("attributes", {}).get("name") or "")
+        return str(_attributes(value[0]).get("name") or "")
     return ""
 
 
@@ -94,7 +96,9 @@ def _annual_base_salary(salary_attr: Any, interval_attr: Any) -> float | None:
     An unknown or blank interval is treated as annual.
     """
     amount = _base_salary(salary_attr)
-    if amount is None:
+    # 0, negative or missing pay isn't a real figure (interns, unset fields);
+    # blank it so it stays out of the department averages.
+    if amount is None or amount <= 0:
         return None
 
     interval = _text(interval_attr).lower()

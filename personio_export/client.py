@@ -1,16 +1,18 @@
 """Personio API client: authenticate, then fetch employees.
 
 Uses the v1 employee endpoint, with pagination for large companies and
-automatic retries on transient errors.
+automatic retries on transient errors. The retry/backoff loop is delegated to
+urllib3's ``Retry`` (mounted on a ``requests`` Session) rather than hand-rolled.
 """
 
 from __future__ import annotations
 
 import logging
-import time
 from typing import Any
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
@@ -18,14 +20,36 @@ logger = logging.getLogger(__name__)
 PAGE_SIZE = 100
 
 MAX_RETRIES = 3
-RETRY_BACKOFF_SECONDS = 2  # doubles each attempt: 2s, 4s, 8s
-RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+RETRY_BACKOFF_SECONDS = 2  # urllib3 backoff factor: waits ~2s, 4s, 8s between tries
+RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 
 MAX_PAGES = 1000
 
 
 class PersonioAPIError(Exception):
     """Raised when the Personio API returns an error or cannot be reached."""
+
+
+def _build_session() -> requests.Session:
+    """A requests Session that retries transient failures with backoff.
+
+    urllib3's ``Retry`` handles the retry/backoff loop for us.
+    ``raise_on_status=False`` means that once retries are exhausted the last
+    response is returned instead of raising, so we can inspect the status code
+    and return clear, Personio-specific error messages.
+    """
+    retry = Retry(
+        total=MAX_RETRIES,
+        backoff_factor=RETRY_BACKOFF_SECONDS,
+        status_forcelist=sorted(RETRYABLE_STATUS),
+        allowed_methods=frozenset({"GET", "POST"}),
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session = requests.Session()
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
 
 
 class PersonioClient:
@@ -35,40 +59,20 @@ class PersonioClient:
         self._client_secret = client_secret
         self._timeout = timeout
         self._token: str | None = None
+        self._session = _build_session()
 
-    def _request_with_retry(self, method: str, url: str, **kwargs: Any) -> requests.Response:
-        last_error = ""
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                response = requests.request(method, url, timeout=self._timeout, **kwargs)
-            except requests.RequestException as exc:
-                last_error = f"network error: {exc}"
-            else:
-                if response.status_code not in RETRYABLE_STATUS:
-                    return response
-                last_error = f"HTTP {response.status_code}"
-
-            if attempt < MAX_RETRIES:
-                wait = RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1))
-                logger.warning(
-                    "Personio request failed (%s). Retry %d/%d in %ds...",
-                    last_error,
-                    attempt,
-                    MAX_RETRIES - 1,
-                    wait,
-                )
-                time.sleep(wait)
-
-        raise PersonioAPIError(
-            f"Personio request failed after {MAX_RETRIES} attempts ({last_error})."
-        )
+    def _request(self, method: str, url: str, **kwargs: Any) -> requests.Response:
+        try:
+            return self._session.request(method, url, timeout=self._timeout, **kwargs)
+        except requests.RequestException as exc:
+            raise PersonioAPIError(f"Could not reach Personio: {exc}") from exc
 
     def authenticate(self) -> None:
         if not self._client_id or not self._client_secret:
             raise PersonioAPIError("API token missing: client_id/client_secret not set.")
 
         logger.info("Authenticating with Personio...")
-        response = self._request_with_retry(
+        response = self._request(
             "POST",
             f"{self.base_url}/v1/auth",
             json={"client_id": self._client_id, "client_secret": self._client_secret},
@@ -100,7 +104,7 @@ class PersonioClient:
         offset = 0
 
         for _ in range(MAX_PAGES):
-            response = self._request_with_retry(
+            response = self._request(
                 "GET",
                 f"{self.base_url}/v1/company/employees",
                 headers=headers,

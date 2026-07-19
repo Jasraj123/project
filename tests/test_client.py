@@ -5,6 +5,8 @@ from unittest.mock import Mock, patch
 
 from personio_export.client import PAGE_SIZE, PersonioAPIError, PersonioClient
 
+_REQUEST = "personio_export.client.requests.Session.request"
+
 
 def _auth_response(token="tok", status=200):
     resp = Mock()
@@ -29,15 +31,13 @@ def _page_response(count, total_pages=None, status=200):
 
 class AuthenticateTests(unittest.TestCase):
     def test_token_is_stored_on_success(self):
-        with patch("personio_export.client.requests.request", return_value=_auth_response("abc")):
+        with patch(_REQUEST, return_value=_auth_response("abc")):
             client = PersonioClient("https://api.personio.de", "id", "secret")
             client.authenticate()
             self.assertEqual(client._token, "abc")
 
     def test_401_raises_clear_error(self):
-        with patch(
-            "personio_export.client.requests.request", return_value=_auth_response(status=401)
-        ):
+        with patch(_REQUEST, return_value=_auth_response(status=401)):
             client = PersonioClient("https://api.personio.de", "id", "secret")
             with self.assertRaises(PersonioAPIError):
                 client.authenticate()
@@ -59,38 +59,32 @@ class FetchEmployeesTests(unittest.TestCase):
             _page_response(PAGE_SIZE, total_pages=2),
             _page_response(30, total_pages=2),
         ]
-        with patch("personio_export.client.requests.request", side_effect=pages) as mock_req:
+        with patch(_REQUEST, side_effect=pages) as mock_req:
             employees = self._authed_client().fetch_employees()
         self.assertEqual(len(employees), PAGE_SIZE + 30)
         self.assertEqual(mock_req.call_count, 2)
 
     def test_stops_on_short_page_without_metadata(self):
         pages = [_page_response(PAGE_SIZE), _page_response(10)]
-        with patch("personio_export.client.requests.request", side_effect=pages) as mock_req:
+        with patch(_REQUEST, side_effect=pages) as mock_req:
             employees = self._authed_client().fetch_employees()
         self.assertEqual(len(employees), PAGE_SIZE + 10)
         self.assertEqual(mock_req.call_count, 2)
 
     def test_single_short_page_makes_one_call(self):
-        with patch(
-            "personio_export.client.requests.request", side_effect=[_page_response(5)]
-        ) as mock_req:
+        with patch(_REQUEST, side_effect=[_page_response(5)]) as mock_req:
             employees = self._authed_client().fetch_employees()
         self.assertEqual(len(employees), 5)
         self.assertEqual(mock_req.call_count, 1)
 
     def test_422_raises_clear_error(self):
-        with patch(
-            "personio_export.client.requests.request", side_effect=[_page_response(0, status=422)]
-        ):
+        with patch(_REQUEST, side_effect=[_page_response(0, status=422)]):
             with self.assertRaises(PersonioAPIError) as ctx:
                 self._authed_client().fetch_employees()
         self.assertIn("422", str(ctx.exception))
 
     def test_403_raises_permission_error(self):
-        with patch(
-            "personio_export.client.requests.request", side_effect=[_page_response(0, status=403)]
-        ):
+        with patch(_REQUEST, side_effect=[_page_response(0, status=403)]):
             with self.assertRaises(PersonioAPIError) as ctx:
                 self._authed_client().fetch_employees()
         self.assertIn("403", str(ctx.exception))

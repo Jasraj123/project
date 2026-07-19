@@ -183,16 +183,31 @@ All settings live in `config.yaml` (copied from `config.example.yaml`):
 
 ## Running daily (scheduling)
 
-The tool does one run per invocation and overwrites the CSVs with fresh data,
-so schedule it with whatever your environment already has:
+The tool does one run per invocation and overwrites the CSVs with fresh data, so
+it's a stateless, idempotent daily job. There are two ways to run it daily.
+
+**Recommended (production): the OS scheduler.** It survives reboots and plugs
+into your existing monitoring, with no long-running process to host.
 
 - **macOS/Linux (cron)** — run every day at 06:00:
 
   ```
-  0 6 * * *  cd /path/to/personio && /usr/bin/python3 run_export.py >> export.log 2>&1
+  0 6 * * *  cd /path/to/personio && /usr/bin/python3 run_export.py --live >> export.log 2>&1
   ```
 
-- **Windows** — use Task Scheduler to run `python run_export.py` daily.
+- **Windows** — use Task Scheduler to run `python run_export.py --live` daily.
+
+**Convenience (demos / simple setups): the built-in `--daily` loop.** It runs
+immediately and then repeats once a day until you stop it with Ctrl+C:
+
+```bash
+python run_export.py --live --daily            # run now, then every 24 hours
+python run_export.py --live --daily --at 06:00 # run now, then daily at 06:00 local time
+```
+
+If a run fails in `--daily` mode, the error is logged and the tool keeps
+scheduling the next run rather than exiting. This mode needs the process to stay
+alive, so for anything unattended prefer cron / Task Scheduler.
 
 ## Running with Docker
 

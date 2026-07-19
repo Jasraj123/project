@@ -204,18 +204,16 @@ _POSITIONS = [
 _EMPLOYMENT_TYPES = ["internal", "internal", "internal", "external"]
 _WEEKLY_HOURS = ["40", "40", "40", "32", "20"]
 
-_FIRST_NAMES = [
-    "Alex", "Bianca", "Chen", "Diana", "Ewan", "Farah", "Georg", "Hana", "Ivan",
-    "Julia", "Kwame", "Lena", "Mateo", "Nadia", "Omar", "Petra", "Quentin",
-    "Rosa", "Sven", "Tara", "Uwe", "Vera", "Wassim", "Xenia", "Yara", "Zoltan",
-    "Aisha", "Bruno", "Carla", "Dmitri", "Elif", "Finn", "Greta", "Hugo",
-]
-_LAST_NAMES = [
-    "Berg", "Novak", "Wu", "Ferreira", "Clarke", "Idris", "Schmidt", "Ito",
-    "Petrov", "Meier", "Osei", "Kaur", "Rossi", "Haddad", "Khan", "Novakova",
-    "Dubois", "Silva", "Larsson", "Nguyen", "Weber", "Costa", "Ali", "Popescu",
-    "Fischer", "Santos", "Kowalski", "Bauer", "Reyes", "Andersson",
-]
+_FIRST_NAMES = (
+    "Alex Bianca Chen Diana Ewan Farah Georg Hana Ivan Julia Kwame Lena Mateo "
+    "Nadia Omar Petra Quentin Rosa Sven Tara Uwe Vera Wassim Xenia Yara Zoltan "
+    "Aisha Bruno Carla Dmitri Elif Finn Greta Hugo"
+).split()
+_LAST_NAMES = (
+    "Berg Novak Wu Ferreira Clarke Idris Schmidt Ito Petrov Meier Osei Kaur "
+    "Rossi Haddad Khan Novakova Dubois Silva Larsson Nguyen Weber Costa Ali "
+    "Popescu Fischer Santos Kowalski Bauer Reyes Andersson"
+).split()
 
 
 def _iso(day: date) -> str:

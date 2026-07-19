@@ -86,8 +86,10 @@ oversights:
 
 - **Email / BI-warehouse delivery** - the delivery layer is pluggable; I built
   the SFTP target the brief called out rather than half-building several.
-- **A scheduler** - every OS already has one (cron / Task Scheduler); shipping our
-  own would be more to maintain and explain.
+- **A heavyweight scheduler** - every OS already has one (cron / Task Scheduler),
+  which survives reboots and integrates with the customer's monitoring. A small
+  optional `--daily` loop is included as a convenience for demos and simple
+  setups, but the OS scheduler is the recommended production path.
 - **Incremental sync** - a full daily export is simpler and correct for 2,000
   employees. `updated_since` is the obvious next step if volume grows.
 - **A database / warehouse load** - out of scope for a payroll CSV, and easy to add

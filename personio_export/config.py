@@ -5,38 +5,15 @@ Credential precedence: environment variable > .env > config.yaml > default.
 
 from __future__ import annotations
 
-import logging
 import os
 from dataclasses import dataclass
 
 import yaml
-
-logger = logging.getLogger(__name__)
+from dotenv import load_dotenv
 
 
 class ConfigError(Exception):
     """Raised when the configuration file is missing or incomplete."""
-
-
-def load_dotenv(path: str = ".env") -> None:
-    """Load KEY=VALUE lines from a .env file into os.environ (existing vars win)."""
-    if not os.path.exists(path):
-        return
-    try:
-        with open(path, encoding="utf-8") as handle:
-            for line in handle:
-                stripped = line.strip()
-                if not stripped or stripped.startswith("#") or "=" not in stripped:
-                    continue
-                key, _, value = stripped.partition("=")
-                key = key.strip()
-                if key.startswith("export "):
-                    key = key[len("export ") :].strip()
-                value = value.strip().strip('"').strip("'")
-                if key:
-                    os.environ.setdefault(key, value)
-    except OSError as exc:
-        logger.warning("Could not read .env file '%s': %s", path, exc)
 
 
 @dataclass
@@ -79,9 +56,7 @@ def load_config(path: str) -> Config:
     use_mock_data = bool(raw.get("use_mock_data", False))
 
     base_url = (
-        os.environ.get("PERSONIO_BASE_URL")
-        or personio.get("base_url")
-        or "https://api.personio.de"
+        os.environ.get("PERSONIO_BASE_URL") or personio.get("base_url") or "https://api.personio.de"
     )
     client_id = os.environ.get("PERSONIO_CLIENT_ID") or personio.get("client_id", "")
     client_secret = os.environ.get("PERSONIO_CLIENT_SECRET") or personio.get("client_secret", "")
@@ -100,6 +75,11 @@ def load_config(path: str) -> Config:
     sftp = delivery.get("sftp", {})
     documents = raw.get("documents", {})
 
+    try:
+        sftp_port = int(sftp.get("port", 22) or 22)
+    except (TypeError, ValueError):
+        raise ConfigError("delivery.sftp.port must be a whole number (e.g. 22).") from None
+
     config = Config(
         base_url=base_url.rstrip("/"),
         client_id=client_id,
@@ -111,7 +91,7 @@ def load_config(path: str) -> Config:
         mock_employee_count=mock_employee_count,
         delivery_type=str(delivery.get("type", "local")),
         sftp_host=sftp.get("host", ""),
-        sftp_port=int(sftp.get("port", 22) or 22),
+        sftp_port=sftp_port,
         sftp_username=sftp.get("username", ""),
         sftp_remote_dir=sftp.get("remote_dir", "."),
         sftp_private_key_path=sftp.get("private_key_path", ""),

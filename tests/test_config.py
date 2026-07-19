@@ -85,6 +85,22 @@ class ConfigEnvPrecedenceTests(_CleanEnv):
             config = load_config(path)
         self.assertTrue(config.use_mock_data)
 
+    def test_non_numeric_sftp_port_raises_clean_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "config.yaml")
+            with open(path, "w", encoding="utf-8") as handle:
+                yaml.safe_dump(
+                    {
+                        "personio": {},
+                        "export": {"output_dir": os.path.join(tmp, "output")},
+                        "use_mock_data": True,
+                        "delivery": {"type": "sftp", "sftp": {"port": "notanumber"}},
+                    },
+                    handle,
+                )
+            with self.assertRaises(ConfigError):
+                load_config(path)
+
 
 class LoadDotenvTests(_CleanEnv):
     def test_loads_values_from_file(self):

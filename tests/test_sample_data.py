@@ -55,16 +55,16 @@ class GeneratorTransformTests(unittest.TestCase):
         )
 
     def test_salaries_are_annualised_numbers(self):
-        salaries = [r["Base Salary"] for r in self.rows if isinstance(r["Base Salary"], (int, float))]
+        salaries = [
+            r["Base Salary"] for r in self.rows if isinstance(r["Base Salary"], (int, float))
+        ]
         self.assertTrue(salaries)
         # Even a monthly amount, once annualised, is comfortably above 10k.
         self.assertTrue(all(salary > 10000 for salary in salaries))
 
     def test_international_departments_mix_currencies(self):
         intl = {
-            r["_currency"]
-            for r in self.rows
-            if r["department"] in {"Sales", "Customer Success"}
+            r["_currency"] for r in self.rows if r["department"] in {"Sales", "Customer Success"}
         }
         self.assertTrue({"GBP", "USD"} & intl, "international teams should include non-EUR pay")
 

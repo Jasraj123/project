@@ -108,9 +108,7 @@ def fetch_all_document_metadata(
         for doc in fetch_document_metadata(base_url, token, owner_id, timeout):
             doc.setdefault("owner", {"id": owner_id})
             all_documents.append(doc)
-    logger.info(
-        "Found %d document(s) across %d employee(s)", len(all_documents), len(owner_ids)
-    )
+    logger.info("Found %d document(s) across %d employee(s)", len(all_documents), len(owner_ids))
     return all_documents
 
 
@@ -124,7 +122,9 @@ def download_document(
         timeout=timeout,
     )
     if response.status_code == 409:
-        raise DocumentAPIError(f"Document {document_id} was flagged unsafe and cannot be downloaded.")
+        raise DocumentAPIError(
+            f"Document {document_id} was flagged unsafe and cannot be downloaded."
+        )
     if not response.ok:
         raise DocumentAPIError(
             f"Failed to download document {document_id} ({response.status_code})."

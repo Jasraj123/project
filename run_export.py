@@ -14,6 +14,8 @@ import argparse
 import logging
 import os
 import sys
+import time
+from datetime import datetime, timedelta
 
 from personio_export.client import PersonioAPIError, PersonioClient
 from personio_export.config import Config, ConfigError, load_config
@@ -167,6 +169,58 @@ def run(config_path: str, force_mock: bool | None = None, mock_count: int | None
     return 0
 
 
+def _next_run_time(now: datetime, at_time: str | None) -> datetime:
+    """When the next daily run should happen.
+
+    With ``at_time`` ("HH:MM") the next run is at that local clock time; without
+    it, the next run is simply 24 hours from ``now``.
+    """
+    if not at_time:
+        return now + timedelta(days=1)
+
+    hour, minute = (int(part) for part in at_time.split(":", 1))
+    target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if target <= now:
+        target += timedelta(days=1)
+    return target
+
+
+def run_daily(
+    config_path: str,
+    force_mock: bool | None,
+    mock_count: int | None,
+    at_time: str | None,
+) -> int:
+    """Run the export now and then repeat every day until interrupted.
+
+    This is a convenience for demos and simple setups. For production, the OS
+    scheduler (cron / Task Scheduler) is recommended - it survives reboots and
+    plugs into the customer's existing monitoring.
+    """
+    logger.info("Daily mode: running now, then once a day. Press Ctrl+C to stop.")
+    try:
+        while True:
+            exit_code = run(config_path, force_mock=force_mock, mock_count=mock_count)
+            if exit_code != 0:
+                logger.warning(
+                    "Export finished with errors (exit code %d); will try again at the "
+                    "next scheduled run.",
+                    exit_code,
+                )
+
+            next_run = _next_run_time(datetime.now(), at_time)
+            seconds = max((next_run - datetime.now()).total_seconds(), 0)
+            logger.info(
+                "Next run scheduled for %s (in %.1f hours).",
+                next_run.strftime("%Y-%m-%d %H:%M:%S"),
+                seconds / 3600,
+            )
+            time.sleep(seconds)
+    except KeyboardInterrupt:
+        logger.info("Daily mode stopped.")
+        return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Export Personio employees to CSV.")
     parser.add_argument(
@@ -189,7 +243,29 @@ def main() -> None:
         help="Force mock mode. Optionally give a number of synthetic employees "
         "to generate (e.g. --mock 2000). --mock 0 uses the small built-in sample.",
     )
+    parser.add_argument(
+        "--daily",
+        action="store_true",
+        help="Convenience scheduler: run now, then repeat once a day until stopped "
+        "(Ctrl+C). For production, prefer cron / Task Scheduler.",
+    )
+    parser.add_argument(
+        "--at",
+        metavar="HH:MM",
+        help="With --daily, run at this local time each day (e.g. --at 06:00) "
+        "instead of every 24 hours from the first run.",
+    )
     args = parser.parse_args()
+
+    if args.at and not args.daily:
+        parser.error("--at can only be used together with --daily.")
+    if args.at:
+        try:
+            hour, minute = (int(part) for part in args.at.split(":", 1))
+            if not (0 <= hour < 24 and 0 <= minute < 60):
+                raise ValueError
+        except ValueError:
+            parser.error("--at must be a 24-hour time like 06:00.")
 
     force_mock: bool | None = None
     mock_count: int | None = None
@@ -201,6 +277,8 @@ def main() -> None:
             mock_count = args.mock
 
     _setup_logging()
+    if args.daily:
+        sys.exit(run_daily(args.config, force_mock, mock_count, args.at))
     sys.exit(run(args.config, force_mock=force_mock, mock_count=mock_count))
 
 
